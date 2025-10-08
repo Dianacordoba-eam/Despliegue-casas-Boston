@@ -1,86 +1,55 @@
 
-import streamlit as st
 import pandas as pd
-import joblib
 import numpy as np
+import joblib
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
 
-# ==============================
-# CONFIGURACIÓN DE LA PÁGINA
-# ==============================
-st.set_page_config(page_title="Predicción Precio Casas - Boston", layout="centered")
-st.title("🏠 Predicción del Precio de Casas (Boston)")
+# Cargar dataset
+df = pd.read_csv("/content/Precios_Casas_Boston.csv")
 
-st.write("Ingrese las características para predecir el precio medio de una vivienda (MEDV):")
+# Verificar nombres de columnas
+print("Columnas del dataset:", df.columns.tolist())
 
-# ==============================
-# CARGA DE ARCHIVOS DEL MODELO
-# ==============================
-try:
-    model = joblib.load("best_model.pkl")
-    scaler = joblib.load("minmax_scaler.pkl")
-    feature_columns = joblib.load("feature_columns.pkl")
-    feature_ranges = joblib.load("feature_ranges.pkl")
-except FileNotFoundError:
-    st.error("❌ No se encontraron los archivos del modelo. Verifique que los .pkl estén en el mismo directorio.")
-    st.stop()
+# Definir variable objetivo y predictoras
+target = 'medv'  # precio medio de la vivienda
+X = df.drop(columns=[target])
+y = df[target]
 
-# ==============================
-# NOMBRES AMIGABLES PARA VARIABLES
-# ==============================
-nombres_amigables = {
-    'crim': 'Tasa de criminalidad per cápita',
-    'zn': 'Proporción de zonas residenciales (ZN)',
-    'indus': 'Proporción de zonas industriales (%)',
-    'chas': 'Límite con río Charles (1 = sí, 0 = no)',
-    'nox': 'Contaminación por óxidos nítricos (NOX)',
-    'rm': 'Promedio de habitaciones por vivienda (RM)',
-    'age': 'Casas construidas antes de 1940 (%)',
-    'dis': 'Distancia ponderada a centros de empleo (DIS)',
-    'rad': 'Índice de acceso a autopistas radiales (RAD)',
-    'tax': 'Tasa de impuestos sobre la propiedad (TAX)',
-    'ptratio': 'Relación alumno/profesor (PTRATIO)',
-    'black': 'Índice población afroamericana (BLACK)',
-    'lstat': 'Porcentaje de población de bajo estatus (LSTAT)'
-}
+# División en entrenamiento y prueba
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# ==============================
-# ENTRADA DE USUARIO
-# ==============================
-vals = {}
-for col in feature_columns:
-    lo = float(feature_ranges[col]['min'])
-    hi = float(feature_ranges[col]['max'])
-    default = float((lo + hi) / 2)
-    label = nombres_amigables.get(col, col)
-    vals[col] = st.number_input(
-        label,
-        min_value=lo,
-        max_value=hi,
-        value=default,
-        format="%.3f"
-    )
+# Escalado
+scaler = MinMaxScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-# Convertir a DataFrame
-input_df = pd.DataFrame([vals], columns=feature_columns)
+# Entrenar modelo
+model = RandomForestRegressor(random_state=42, n_estimators=200)
+model.fit(X_train_scaled, y_train)
 
-# Escalar las entradas antes de predecir
-input_scaled = pd.DataFrame(scaler.transform(input_df), columns=feature_columns)
+# Evaluar modelo
+y_pred = model.predict(X_test_scaled)
+rmse = mean_squared_error(y_test, y_pred, squared=False)
+r2 = r2_score(y_test, y_pred)
 
-# ==============================
-# PREDICCIÓN
-# ==============================
-if st.button("🔮 Predecir precio"):
-    pred = model.predict(input_scaled)[0]
+print(f"✅ Modelo entrenado correctamente")
+print(f"RMSE: {rmse:.3f}")
+print(f"R²: {r2:.3f}")
 
-    st.markdown("---")
-    st.markdown("### 🏡 **Resultado de la predicción:**")
-    st.success(f"**Precio estimado:** ${pred * 1000:,.2f} USD")
+# Guardar archivos correctamente sincronizados
+joblib.dump(model, "best_model.pkl")
+joblib.dump(scaler, "minmax_scaler.pkl")
+joblib.dump(X.columns.tolist(), "feature_columns.pkl")
 
-    st.markdown(
-        "<p style='text-align:center; color:gray;'>"
-        "El precio está expresado en miles de dólares (MEDV × 1000).<br>"
-        "Modelo entrenado con el conjunto de datos de Boston Housing."
-        "</p>",
-        unsafe_allow_html=True
-    )
+# Guardar rangos originales (sin escalar)
+feature_ranges = X.agg(['min', 'max']).to_dict()
+joblib.dump(feature_ranges, "feature_ranges.pkl")
 
+print("✅ Archivos guardados correctamente:")
+print("- best_model.pkl")
+print("- minmax_scaler.pkl")
+print("- feature_columns.pkl")
+print("- feature_ranges.pkl")
