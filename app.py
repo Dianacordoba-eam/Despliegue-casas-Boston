@@ -1,5 +1,4 @@
-
-mport streamlit as st
+import streamlit as st
 import pandas as pd
 import joblib
 import numpy as np
@@ -83,3 +82,4 @@ if st.button("🔮 Predecir precio"):
         "</p>",
         unsafe_allow_html=True
     )
+
